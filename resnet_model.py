@@ -36,11 +36,18 @@ def batch_norm_relu(x):
     return  r_bnr
 
 
-def conv2(input_images,filter_size,stride,in_filters,out_filters,padding='SAME'):
+def conv2(input_images,filter_size,stride,in_filters,out_filters,padding='SAME',xvaier=True):
 
     n=filter_size*filter_size*out_filters
     #卷积核初始化
-    weights=tf.Variable(tf.random_normal(shape=[filter_size,filter_size,in_filters,out_filters],
+    if xvaier:
+
+        weights=tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False)
+                            ([filter_size,filter_size,in_filters,out_filters])
+                            ,name = 'weights')
+    else:
+
+        weights=tf.Variable(tf.random_normal(shape=[filter_size,filter_size,in_filters,out_filters],
                                          stddev=2.0/n,dtype=tf.float32),
                         dtype=tf.float32,
                         name='weights')
@@ -48,14 +55,81 @@ def conv2(input_images,filter_size,stride,in_filters,out_filters,padding='SAME')
     r_conv=tf.nn.conv2d(input_images,weights,strides=stride,padding=padding)
     r_biases=tf.add(r_conv,biases)
     return r_biases
+def local_share_weight_conv2(input_images,filter_size,stride,out_filters,div_w=2,div_h=3,padding='SAME',weight=None,activate=tf.nn.relu):
+    #将权重分模块做卷积
+    in_filters=input_images.get_shape().as_list()[-1]
+    #卷积核初始化
+
+    part_results=[]
+    num_part=div_w*div_h
+    shape_input=input_images.get_shape().as_list()
+    #每一部分的宽度和高度计算
+    w_part_middle=shape_input[1]//div_w
+    h_part_middle=shape_input[2]//div_h
+    norm_part_width=shape_input[1]//div_w
+    norm_part_height=shape_input[2]//div_h
+    region_list=[]
+
+    begin_w = 0
+    begin_h = 0
+
+    for part in range(num_part):
+        change_line=False
+
+        if (part+1)%div_w==0:
+            part_width=shape_input[1]
+            change_line=True
+        else:
+            part_width=w_part_middle+begin_w
+        if num_part-(part+1)<div_w:
+            part_height=shape_input[2]
+        else:
+            part_height=h_part_middle+begin_h
+        region_list.append([begin_w,part_width,begin_h,part_height])
+
+        begin_w = begin_w+norm_part_width if not change_line else 0
+        begin_h = begin_h+norm_part_height if  change_line else begin_h
+        #print(begin_w,begin_h)
+
+    for i in range(num_part):
+        # print(i)
+        biase = tf.Variable(tf.constant(0.0, shape=[out_filters]), dtype=tf.float32, name='biases'+str(i))
+        if weight:
+            _weights=weight
+        else:
+            _weights=tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False)
+                            ([filter_size,filter_size,in_filters,out_filters])
+                            ,name = 'weight1'+str(i))
+
+        part_input = input_images[:, region_list[i][0]:region_list[i][1], region_list[i][2]:region_list[i][3], :]
+        r_conv = tf.nn.conv2d(part_input, _weights, strides=stride, padding=padding)
+        r_biases = tf.add(r_conv, biase)
+        r_act = activate(r_biases)
+        part_results.append(r_act)
+    hori_result=[]
+    for r_i in range(len(part_results)):
+        if r_i%div_w==0:
+            hori_result.append(tf.concat(part_results[r_i:r_i+div_w],axis=1))
+
+    _result=tf.concat(hori_result,axis=2)
+    # print(
+    #       'result',_result.get_shape().as_list())
+    relu_result=tf.nn.relu(_result,name='relu')
+    return relu_result
 
 
-def pad_conv2(input_x,pad,filter_size,stride,in_filters,out_filters):
+def pad_conv2(input_x,pad,filter_size,stride,in_filters,out_filters,xvaier=True):
     #
     # input_image = tf.Variable([[[[11, 21, 31], [41, 51, 61]], [[12, 23, 32], [43, 53, 63]]],
     #                            [[[1, 2, 3], [4, 5, 6]], [[14, 24, 34], [45, 55, 65]]]])
     # padding = tf.Variable([[0, 0], [0, 0], [3, 3], [3, 3]])
-    weights = tf.Variable(tf.random_normal(shape=[filter_size, filter_size, in_filters, out_filters],
+    if xvaier:
+
+        weights=tf.Variable(tf.contrib.layers.xavier_initializer(uniform=False)
+                            ([filter_size,filter_size,in_filters,out_filters])
+                            ,name = 'weights')
+    else:
+        weights = tf.Variable(tf.random_normal(shape=[filter_size, filter_size, in_filters, out_filters],
                                            dtype=tf.float32),
                           dtype=tf.float32,
                           name='weights')
@@ -184,7 +258,9 @@ def model(input_x):
         with tf.name_scope('lin'):
             r_lin=lin(residual,nFeats,nFeats)
         with tf.name_scope('conv_same'):
-            output=conv2(r_lin,1,[1,1,1,1],nFeats,nPoint,padding='VALID')#特征图输出
+            #局部共享权值
+            output=local_share_weight_conv2(r_lin,1,[1,1,1,1],nPoint)
+            #output=conv2(r_lin,1,[1,1,1,1],nFeats,nPoint,padding='VALID')#特征图输出
         if n<(nStack-1):
             #print(n)
             with tf.name_scope('next_input'):
