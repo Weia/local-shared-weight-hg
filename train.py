@@ -13,7 +13,7 @@ import sys
 
 Num_Epoch=1000
 batch_size=3
-filename='/home/weic/project/linux/mirrortrain.tfrecords'
+filename='/media/weic/新加卷/my_dataset/final_train.tfrecords'
 GPU='/gpu:0'
 CPU='/cpu:0'
 device=GPU
@@ -22,7 +22,7 @@ decay_steps=2000
 decay_rate=0.95
 staircase=True
 step_to_save=200
-epochSize=6200
+epochSize=4200
 step_to_val=1000
 valIters=10
 def cal_acc(output,gtMaps,batchSize):
@@ -143,6 +143,8 @@ def train(lr):
                     exma_list.append(example.shape)
                     nor_images = processing.image_normalization(example)  # 归一化图像
                     label = gene_hm.batch_genehm(batch_size, l)  # heatmap label
+
+
                     train_step = sess.run(global_step)
                     if (i+1)%step_to_save==0:
 
@@ -154,8 +156,11 @@ def train(lr):
                         saver.save(sess,os.path.join(os.getcwd(),'model/model%d.ckpt'%(train_step)))
                         #print(save_path)
                     else:
-                        _, loss = sess.run([train_op, train_loss],
+                        _, loss,output = sess.run([train_op, train_loss,logits],
                                                     feed_dict={input_image: nor_images, labels: label})
+                        for i in range(batch_size):
+                            plt.matshow(np.sum(output[0], axis=0))
+                            plt.show()
                     #csv
                     train_list.append([train_step,loss])
 

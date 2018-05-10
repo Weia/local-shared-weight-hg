@@ -4,7 +4,7 @@ HM_HEIGHT=64
 HM_WIDTH=64
 nPoints=16
 def resize_label(label):
-    return label*64/256
+    return label*HM_WIDTH/256
 def _makeGaussian(height, width, sigma, center):
     """
     以center为中心生成值逐渐减小的矩阵，中心值为一
@@ -41,9 +41,11 @@ def generate_hm(height, width ,joints, maxlenght):
 
     return r_hm
 def batch_genehm(batch_size,l):
+
+    re_label=resize_label(l)
     label = np.zeros((batch_size, nPoints, HM_HEIGHT,HM_WIDTH), dtype=np.float32)
     for i in range(batch_size):
-        label[i] =generate_hm(HM_HEIGHT,HM_WIDTH, l[i], 64)
+        label[i] =generate_hm(HM_HEIGHT,HM_WIDTH, re_label[i], 64)
     return label
 
 

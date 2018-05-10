@@ -55,7 +55,7 @@ def conv2(input_images,filter_size,stride,in_filters,out_filters,padding='SAME',
     r_conv=tf.nn.conv2d(input_images,weights,strides=stride,padding=padding)
     r_biases=tf.add(r_conv,biases)
     return r_biases
-def local_share_weight_conv2(input_images,filter_size,stride,out_filters,div_w=2,div_h=3,padding='SAME',weight=None,activate=tf.nn.relu):
+def local_share_weight_conv2(input_images,filter_size,stride,out_filters,div_w=2,div_h=1,padding='SAME',weight=None,activate=tf.nn.relu):
     #将权重分模块做卷积
     in_filters=input_images.get_shape().as_list()[-1]
     #卷积核初始化

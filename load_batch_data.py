@@ -33,7 +33,7 @@ def batch_samples(batch_size,filename,shuffle=False):
 
     image,label=_read_single_sample(filename)
     label=tf.reshape(label,[-1,2])
-    label = gene_hm.resize_label(label)#将label放缩到64*64
+    #label = gene_hm.resize_label(label)#将label放缩到64*64
     #label=gene_hm.tf_generate_hm(HM_HEIGHT, HM_WIDTH ,label, 64)
     if shuffle:
         image_batch, label_batch = tf.train.shuffle_batch([image, label], batch_size, min_after_dequeue=1000,num_threads=2,capacity=2000)
